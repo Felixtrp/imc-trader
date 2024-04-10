@@ -7,7 +7,7 @@ import seaborn as sns
 sns.set_theme()
 
 def profit(number, a):
-    df = pd.read_csv("round-1-island-data-bottle/prices_round_1_day_" + str(-number) + ".csv", sep=';')
+    df = pd.read_csv("Round1/round-1-island-data-bottle/prices_round_1_day_" + str(-number) + ".csv", sep=';')
     dfs = df.loc[df["product"] == "STARFRUIT"]
     dfs['log_returns'] = np.log(dfs.mid_price) - np.log(dfs.mid_price.shift(1))
     dfs['log_returns_prev'] = dfs['log_returns'].shift(1).ewm(alpha=a).mean()
