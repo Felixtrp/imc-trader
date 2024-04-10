@@ -1,0 +1,66 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Load data from a CSV file
+def load_data(file_path):
+    return pd.read_csv(file_path, delimiter=';')
+
+# Compute volume-limited weighted midpoint for order depths
+def compute_weighted_midpoint(df, volume_limit=500):
+    # Filtering the data for 'STARFRUIT' entries
+    df = df[df['Product'] == 'STARFRUIT']
+    
+    # Ensure the necessary columns are present
+    if 'Bid Price' not in df.columns or 'Ask Price' not in df.columns or 'Bid Volume' not in df.columns or 'Ask Volume' not in df.columns:
+        print("Required columns are missing.")
+        return None
+
+    # Calculating weighted bids and asks within the volume limit
+    df['Cumulative Bid Volume'] = df['Bid Volume'].cumsum()
+    df['Cumulative Ask Volume'] = df['Ask Volume'].cumsum()
+    df = df[(df['Cumulative Bid Volume'] <= volume_limit) & (df['Cumulative Ask Volume'] <= volume_limit)]
+
+    if df.empty:
+        return None
+
+    # Calculating weighted prices
+    weighted_bid = (df['Bid Price'] * df['Bid Volume']).sum() / df['Bid Volume'].sum()
+    weighted_ask = (df['Ask Price'] * df['Ask Volume']).sum() / df['Ask Volume'].sum()
+    weighted_midpoint = (weighted_bid + weighted_ask) / 2
+
+    return weighted_midpoint
+
+# Main function to process the data
+def main():
+    base_path = "D:\\IMC 比赛\\imc-trader\\Round1\\round-1-island-data-bottle\\"
+    file_names = ["prices_round_1_day_0.csv", "prices_round_1_day_1.csv", "prices_round_1_day_2.csv"]
+    volume_limit = 500
+
+    results = []
+
+    for file_name in file_names:
+        file_path = base_path + file_name
+        print(f"Processing {file_name}...")
+        df = load_data(file_path)
+        midpoint = compute_weighted_midpoint(df, volume_limit)
+        
+        if midpoint is not None:
+            print(f"Volume-limited Weighted Midpoint for {file_name}: {midpoint}")
+            results.append((file_name, midpoint))
+        else:
+            print("Could not calculate a valid weighted midpoint.")
+
+    # Plot results if any
+    if results:
+        plt.figure(figsize=(10, 6))
+        bar_heights = [result[1] for result in results]
+        bar_labels = [result[0] for result in results]
+        plt.bar(bar_labels, bar_heights, color='blue')
+        plt.xlabel('File Name')
+        plt.ylabel('Weighted Midpoint Price')
+        plt.title('Weighted Midpoint Prices for STARFRUIT Across Different Days')
+        plt.show()
+
+if __name__ == "__main__":
+    main()
