@@ -1,0 +1,58 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_absolute_error
+import numpy as np
+
+# Function to load data from a specific day's CSV file
+def load_data(day_number):
+    # Construct the file path using the day number
+    file_path = r"D:\IMC 比赛\imc-trader\Round1\round-1-island-data-bottle\prices_round_1_day_{}.csv".format(day_number)
+    # Read the CSV file using pandas
+    df = pd.read_csv(file_path, sep=';')
+    return df
+
+# Function to preprocess data
+def preprocess_data(df):
+    # Assuming the dataframe has columns 'Time', 'Price', and 'Volume'
+    # This function can be modified to include more complex preprocessing steps
+    df['Time'] = pd.to_datetime(df['Time'])
+    df['Hour'] = df['Time'].dt.hour
+    return df[['Hour', 'Price']]  # Returning only the features we want to use
+
+# Function to perform linear regression
+def perform_regression(X, y):
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    y_pred = model.predict(X_test)
+    mae = mean_absolute_error(y_test, y_pred)
+    print("Mean Absolute Error:", mae)
+    return model
+
+# Main function to manage data loading, preprocessing, and modeling
+def main():
+    data_frames = []
+    day_numbers = [0, 1, 2]  # List of day numbers
+    for day_number in day_numbers:
+        print(f"--- Loading data for day {day_number} ---")
+        df = load_data(day_number)
+        data_frames.append(df)
+    
+    # Combine data from multiple days
+    combined_data = pd.concat(data_frames, ignore_index=True)
+    processed_data = preprocess_data(combined_data)
+    
+    # Prepare features and target variable
+    X = processed_data[['Hour']]  # Features
+    y = processed_data['Price']  # Target variable
+    
+    # Perform regression
+    model = perform_regression(X, y)
+    
+    # Optionally, save the model for later use
+    # import joblib
+    # joblib.dump(model, 'price_prediction_model.pkl')
+
+if __name__ == "__main__":
+    main()
