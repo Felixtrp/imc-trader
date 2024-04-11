@@ -190,7 +190,7 @@ class Trader:
     def calc_next_price_starfruit(self, mid_prices):
         log_returns = np.log(mid_prices/np.roll(mid_prices, shift=1))[1:]
         len = log_returns.size
-        weights = np.array([-0.14667880561441476, -0.272833985462504, -0.45777898391417254, -0.6874337707273701])
+        weights = np.flip(np.array([-0.6885103210205274, -0.4636796936562901, -0.31533602412549744, -0.18833584342346918, -0.09746766021887034]))
         predicted_log_return = np.sum(weights*log_returns)
         predicted_mid_price = np.exp(predicted_log_return + np.log(mid_prices[-1]))
 
@@ -293,14 +293,14 @@ class Trader:
         _, bb_starfruit = self.values_extract(OrderedDict(sorted(state.order_depths['STARFRUIT'].buy_orders.items(), reverse=True)), 1)
                     
         starfruit_cache.append((bs_starfruit+bb_starfruit)/2)
-        mid_prices = np.array(starfruit_cache)[-5:]
+        mid_prices = np.array(starfruit_cache)[-6:]
         
         INF = 1e9
         
         starfruit_lb = -INF
         starfruit_ub = INF
 
-        if mid_prices.size == 5:
+        if mid_prices.size == 6:
             starfruit_lb = self.calc_next_price_starfruit(mid_prices)-1
             starfruit_ub = self.calc_next_price_starfruit(mid_prices)+1    
             
