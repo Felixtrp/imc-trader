@@ -150,8 +150,15 @@ class Trader:
         mprice_ours = (acc_bid+acc_ask)/2
         
         # Undercut prices
-        undercut_buy = best_buy_pr + 1 
-        undercut_sell = best_sell_pr - 1 
+        buy_tail, sell_tail = 1, 1
+        if cpos > 15:
+            buy_tail = 0
+            sell_tail = 2
+        elif cpos < -15:
+            buy_tail = 2
+            sell_tail = 0
+        undercut_buy = best_buy_pr + buy_tail
+        undercut_sell = best_sell_pr - sell_tail
         
         # Define the prices at which we will buy and sell
         bid_pr = min(undercut_buy, acc_bid-1) 
