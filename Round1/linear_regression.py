@@ -150,15 +150,8 @@ class Trader:
         mprice_ours = (acc_bid+acc_ask)/2
         
         # Undercut prices
-        buy_tail, sell_tail = 1, 1
-        if cpos > 15:
-            buy_tail = 0
-            sell_tail = 2
-        elif cpos < -15:
-            buy_tail = 2
-            sell_tail = 0
-        undercut_buy = best_buy_pr + buy_tail
-        undercut_sell = best_sell_pr - sell_tail
+        undercut_buy = best_buy_pr + 1 
+        undercut_sell = best_sell_pr - 1 
         
         # Define the prices at which we will buy and sell
         bid_pr = min(undercut_buy, acc_bid-1) 
@@ -197,9 +190,8 @@ class Trader:
     def calc_next_price_starfruit(self, mid_prices):
         log_returns = np.log(mid_prices/np.roll(mid_prices, shift=1))[1:]
         len = log_returns.size
-        alpha = 0.3
-        weights = np.power((1 - alpha)*np.ones(shape=len), np.arange(len))
-        predicted_log_return = np.sum(weights*log_returns) / np.sum(weights)
+        weights = np.flip(np.array([-0.6885103210205274, -0.4636796936562901, -0.31533602412549744, -0.18833584342346918, -0.09746766021887034]))
+        predicted_log_return = np.sum(weights*log_returns)
         predicted_mid_price = np.exp(predicted_log_return + np.log(mid_prices[-1]))
 
         return int(round(predicted_mid_price))
@@ -301,14 +293,14 @@ class Trader:
         _, bb_starfruit = self.values_extract(OrderedDict(sorted(state.order_depths['STARFRUIT'].buy_orders.items(), reverse=True)), 1)
                     
         starfruit_cache.append((bs_starfruit+bb_starfruit)/2)
-        mid_prices = np.array(starfruit_cache)[-20:]
+        mid_prices = np.array(starfruit_cache)[-6:]
         
         INF = 1e9
         
         starfruit_lb = -INF
         starfruit_ub = INF
 
-        if mid_prices.size > 1:
+        if mid_prices.size == 6:
             starfruit_lb = self.calc_next_price_starfruit(mid_prices)-1
             starfruit_ub = self.calc_next_price_starfruit(mid_prices)+1    
             
