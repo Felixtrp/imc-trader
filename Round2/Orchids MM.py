@@ -4,6 +4,7 @@ import json
 from datamodel import Listing, Observation, Order, OrderDepth, ProsperityEncoder, Symbol, Trade, TradingState
 from collections import defaultdict, OrderedDict
 import copy
+import numpy as np
 
 class Logger:
     def __init__(self) -> None:
@@ -95,7 +96,7 @@ class Trader:
         self.current_jumps = 0
         self.last_export_tariff = 0
         self.T = 1000000
-        self.last_order = 0
+        self.mid_price_orchid = 0
     def run(self, state: TradingState):
         conversions = 0
         result = {}
@@ -114,13 +115,16 @@ class Trader:
                 LIMIT = 100
                 obs = state.observations.conversionObservations[product]
                 bid, ask = obs.bidPrice, obs.askPrice
-                export_price, import_price = obs.exportTariff, obs.importTariff
-                shipment_cost = obs.transportFees # do t-1 price?
-                conversions = -self.last_order
+                self.mid_price_orchid = (bid + ask) / 2
+                import_price = obs.importTariff
+                shipment_cost = obs.transportFees
+                conversions = -curr_pos
                 did_sell, orders = self.market_taker_sell(product, orders, obuy, curr_pos, ask + import_price + shipment_cost, LIMIT, 0)
-                self.last_order = did_sell
-
-                logger.print('my position = ' + str(curr_pos))
+                orders.append(Order(product, int(self.mid_price_orchid) - 1, -100 - curr_pos - did_sell))
+                #logger.print('my position = ' + str(curr_pos))
+                #logger.print('my ask take price = ' + str(ask + import_price + shipment_cost)) # buy this price
+                #logger.print('my buy take price = ' + str(int(self.mid_price_orchid) - 1)) #sell this
+                #logger.print('volume ' + str(-LIMIT - curr_pos - did_sell))
                 result[product] = orders
         logger.flush(state, result, conversions, trader_data)
         return result, conversions, trader_data
@@ -157,4 +161,3 @@ class Trader:
                     orders.append(Order(product, bid, bid_vol)) # negative volume
                     did_sell += bid_vol
         return did_sell, orders
-    
