@@ -252,9 +252,9 @@ class Trader:
         conversions = -cpos
         if math.ceil(mid_price) < min(obuy, key=obuy.get):
             did_sell, orders = self.market_taker_sell(self, product, orders, obuy, 0, ask + import_tariff + shipment_cost, LIMIT, did_sell) #cpos
-        if int(mid_price) - 1 > ask + import_tariff + shipment_cost:
+        if int(mid_price) - 1 > acc_ask + import_tariff + shipment_cost:
             orders.append(Order(product, int(mid_price) - 1, -LIMIT - did_sell))
-        elif int(mid_price) - 0 > ask + import_tariff + shipment_cost:
+        elif int(mid_price) - 0 > acc_ask + import_tariff + shipment_cost:
             orders.append(Order(product, int(mid_price) - 0, -LIMIT - did_sell))
         return conversions, orders
         
