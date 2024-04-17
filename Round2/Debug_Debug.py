@@ -251,7 +251,7 @@ class Trader:
         did_sell = 0
         conversions = -cpos
         if math.ceil(mid_price) < min(obuy, key=obuy.get):
-            did_sell, orders = self.market_taker_sell(self, product, orders, obuy, 0, ask + import_tariff + shipment_cost, LIMIT, did_sell) #cpos
+            did_sell, orders = self.market_taker_sell(product, orders, obuy, 0, ask + import_tariff + shipment_cost, LIMIT, did_sell) #cpos
         if int(mid_price) - 1 > acc_ask + import_tariff + shipment_cost:
             orders.append(Order(product, int(mid_price) - 1, -LIMIT - did_sell))
         elif int(mid_price) - 0 > acc_ask + import_tariff + shipment_cost:
@@ -280,19 +280,25 @@ class Trader:
         # Update positions based on state
         for key, val in state.position.items():
             self.position[key] = val
-   
+
         if state.traderData == "":
             starfruit_cache = []
-        else: 
+        else:
             starfruit_cache = jsonpickle.decode(state.traderData)
-                                    
+
         # best sell and best buy values obtained from order depths   
         _, bs_starfruit = self.values_extract(OrderedDict(sorted(state.order_depths['STARFRUIT'].sell_orders.items())))
-        _, bb_starfruit = self.values_extract(OrderedDict(sorted(state.order_depths['STARFRUIT'].buy_orders.items(), reverse=True)), 1)
-                    
-        starfruit_cache.append((bs_starfruit+bb_starfruit)/2)
-        mid_prices = np.array(starfruit_cache)[-20:]
-        
+        _, bb_starfruit = self.values_extract(OrderedDict(sorted(state.order_depths['STARFRUIT'].buy_orders.items(), reverse=True)), 1)        
+
+        starfruit_mid_price = (bs_starfruit+bb_starfruit)/2
+
+        starfruit_cache.append(starfruit_mid_price)
+
+        if len(starfruit_cache) > 20:
+            starfruit_cache.pop(0)
+
+        mid_prices = np.array(starfruit_cache)
+
         INF = 1e9
         
         starfruit_lb = -INF
