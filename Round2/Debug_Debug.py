@@ -92,7 +92,7 @@ class Logger:
 
 logger = Logger()
 
-empty_dict = {'AMETHYSTS' : 0,'STARFRUIT' : 0, 'ORCHIDS' : 0}
+empty_dict = {'AMETHYSTS' : 0,'STARFRUIT' : 0, 'ORCHIDS' : 0, 'GIFT_BASKET': 0}
 def def_value():
         return copy.deepcopy(empty_dict)
 
@@ -102,11 +102,17 @@ class Trader:
         self.last_pos_orchids = 0
     
     position = copy.deepcopy(empty_dict)
-    POSITION_LIMIT = {'AMETHYSTS' : 20, 'STARFRUIT' : 20, 'ORCHIDS' : 100}
+    POSITION_LIMIT = {'AMETHYSTS' : 20, 'STARFRUIT' : 20, 'ORCHIDS' : 100, 'GIFT_BASKET' : 60}
     person_position = defaultdict(def_value)
     person_actvalof_position = defaultdict(def_value)
     starfruit_dim = 4
     
+    def best_ask(self, order_depth):
+        return next(iter(OrderedDict(sorted(order_depth.sell_orders.items()))))
+    
+    def best_bid(self, order_depth):
+        return next(iter(OrderedDict(sorted(order_depth.buy_orders.items(), reverse=True))))
+
     def compute_orders_amethysts(self, product, order_depth, acc_bid, acc_ask):
         orders: list[Order] = []
 
@@ -257,7 +263,43 @@ class Trader:
         elif int(mid_price) - 0 > acc_ask + import_tariff + shipment_cost:
             orders.append(Order(product, int(mid_price) - 0, -LIMIT - did_sell))
         return conversions, orders
-        
+    
+    def compute_orders_gift_baskets(self, product, order_depth, state, underlying_bid, underlying_ask, limit):
+        orders: list[Order] = []
+
+        ask_fixed_difference = 380 #377.3
+        bid_fixed_difference = 380 #381.6
+        step = 1
+ 
+        fair_ask = underlying_ask + ask_fixed_difference
+        fair_bid = underlying_bid + bid_fixed_difference
+
+        current_ask = self.best_ask(order_depth)
+        current_bid = self.best_bid(order_depth)
+
+        sell_opp_value = current_bid - fair_ask
+        buy_opp_value = fair_bid - current_ask
+
+        aim_position = 0
+        if sell_opp_value > 0:
+            aim_position = -(sell_opp_value // step)
+
+        elif buy_opp_value > 0:
+            aim_position = (buy_opp_value // step)
+
+        aim_position = min(aim_position, limit)
+        aim_position = max(aim_position, -limit)
+        cpos = self.position[product]
+        diff_pos = aim_position - cpos
+
+        if diff_pos > 0:
+            orders.append(Order(product, math.floor(fair_bid), math.floor(diff_pos)))
+
+        elif diff_pos < 0:
+            orders.append(Order(product, math.ceil(fair_ask), math.ceil(diff_pos)))
+
+        return orders
+
     def compute_orders(self, product, order_depth, state, acc_bid, acc_ask):
         if product == "AMETHYSTS":
             return self.compute_orders_amethysts(product, order_depth, acc_bid, acc_ask)
@@ -265,6 +307,8 @@ class Trader:
             return self.compute_orders_regression(product, order_depth, acc_bid, acc_ask, self.POSITION_LIMIT[product])
         if product == 'ORCHIDS':
             return self.compute_orders_orchids(product, order_depth, state, acc_bid, acc_ask, self.POSITION_LIMIT[product])
+        if product == 'GIFT_BASKET':
+            return self.compute_orders_gift_baskets(product, order_depth, state, acc_bid, acc_ask, self.POSITION_LIMIT[product])
       
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
@@ -272,7 +316,7 @@ class Trader:
         and outputs a list of orders to be sent
         """
         
-        result = {'AMETHYSTS' : [], 'STARFRUIT' : [], 'ORCHIDS': []}
+        result = {'AMETHYSTS' : [], 'STARFRUIT' : [], 'ORCHIDS': [], 'GIFT_BASKET': []}
         conversions = 0
         trader_data = ""  
         
@@ -323,18 +367,27 @@ class Trader:
         acc_bid['ORCHIDS'] = obs.bidPrice
         acc_ask['ORCHIDS'] = obs.askPrice
 
+        chocolate_ask = self.best_ask(state.order_depths['CHOCOLATE'])
+        chocolate_bid = self.best_bid(state.order_depths['CHOCOLATE'])
+        strawberries_ask = self.best_ask(state.order_depths['STRAWBERRIES'])
+        strawberries_bid = self.best_bid(state.order_depths['STRAWBERRIES'])
+        roses_ask = self.best_ask(state.order_depths['ROSES'])
+        roses_bid = self.best_bid(state.order_depths['ROSES'])
+
+        acc_bid['GIFT_BASKET'] = 4*chocolate_ask + 6*strawberries_ask + roses_ask
+        acc_ask['GIFT_BASKET'] = 4*chocolate_bid + 6*strawberries_bid + roses_bid
         
-        for product in ['AMETHYSTS','STARFRUIT', 'ORCHIDS']:
+        for product in ['AMETHYSTS','STARFRUIT', 'ORCHIDS', 'GIFT_BASKET']:
             order_depth: OrderDepth = state.order_depths[product]
-            if product != 'ORCHIDS':
-                orders = self.compute_orders(product, order_depth, state, acc_bid[product], acc_ask[product])
-            else:
-                c, orders = self.compute_orders(product, order_depth, state, acc_bid[product], acc_ask[product])
-                conversions = c
-            result[product] += orders
+            if product == 'AMETHYSTS' or product == 'STARFRUIT':
+                result[product] = self.compute_orders(product, order_depth, state, acc_bid[product], acc_ask[product])
+            elif product == 'GIFT_BASKET':
+                result[product] = self.compute_orders(product, order_depth, state, acc_bid[product], acc_ask[product])
+            elif product == 'ORCHIDS':
+                conversions, result[product] = self.compute_orders(product, order_depth, state, acc_bid[product], acc_ask[product])
 
         trader_data = jsonpickle.encode(starfruit_cache)
-        logger.flush(state, result, conversions, '')
+        logger.flush(state, result, conversions, "")
         return result, conversions, trader_data
     
     def values_extract(self, order_dict, buy=0):
