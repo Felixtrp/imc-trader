@@ -98,6 +98,13 @@ def compute_pnl(number):
     df_gift_basket["fair_ask"] = df_gift_basket["underlying_ask"] * 1.0058
     df_gift_basket["fair_bid"] = df_gift_basket["underlying_bid"] * 1.0059
 
+    df_gift_basket["residual"] = df_gift_basket.mid_price / df_gift_basket.underlying_mid
+    
+    plt.figure()
+    plt.plot(df_gift_basket.residual)
+    plt.show()
+    print(df_gift_basket.residual.mean(), df_gift_basket.residual.std())
+
     df_gift_basket["sell_opp_value"] = df_gift_basket.bid_price_1 - df_gift_basket.fair_ask
     df_gift_basket["buy_opp_value"] = df_gift_basket.fair_bid - df_gift_basket.ask_price_1
 
@@ -129,17 +136,17 @@ def compute_pnl(number):
     _, _, pnl_min = compute_pnl_helper(df_gift_basket, good_sells, good_buys, pos_limit, low_risk_step)
     min_positions = np.cumsum(df_gift_basket.trades.to_numpy())
 
-    plt.figure()
-    plt.plot(pnl_max, color="red", label="Step:" + str(max_pnl_step))
-    plt.plot(pnl_min, color="green", label="Step:" + str(low_risk_step))
-    plt.legend()
-    plt.show()
+    # plt.figure()
+    # plt.plot(pnl_max, color="red", label="Step:" + str(max_pnl_step))
+    # plt.plot(pnl_min, color="green", label="Step:" + str(low_risk_step))
+    # plt.legend()
+    # plt.show()
 
-    plt.figure()
-    plt.plot(max_positions, color="red", label="Step:" + str(max_pnl_step))
-    plt.plot(min_positions, color="green", label="Step:" + str(low_risk_step))
-    plt.legend()
-    plt.show()
+    # plt.figure()
+    # plt.plot(max_positions, color="red", label="Step:" + str(max_pnl_step))
+    # plt.plot(min_positions, color="green", label="Step:" + str(low_risk_step))
+    # plt.legend()
+    # plt.show()
 
     return max_pnl, max_pnl_step, lowest_pnl, low_risk_step
 
