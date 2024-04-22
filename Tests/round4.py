@@ -125,7 +125,7 @@ class Trader:
     basket_premium = 380
 
     trading_days = 250
-    day_number = 1
+    day_number = 3
     timestamps_per_day = 1000000
     coconut_annualised_volatility = 0.00010095 * (trading_days * (timestamps_per_day / 100))**(1/2)
     coconut_option_strike = 10000
@@ -150,7 +150,8 @@ class Trader:
         return (1.0 + q) / 2.0
 
     def volatility_smile(self, stock_price):
-        a, c = 9.510469372524675e-08, 0.15885082971839998
+        # a, c = 9.510469372524675e-08, 0.15885082971839998
+        a, c = 9.45278607e-08, 0.15884232279875704
         return a*(stock_price - self.coconut_option_strike)**2 + c
     
     def black_scholes(self, stock_mid_price):
@@ -164,7 +165,8 @@ class Trader:
 
         return fair_value
 
-    def compute_orders_coconut_coupon(self, order_depth):
+    def compute_orders_coconut_coupon(self, state):
+        order_depth = state.order_depths
         orders : List[Order] = []
         prods = ['COCONUT', 'COCONUT_COUPON']
         best_asks = {}
@@ -304,10 +306,10 @@ class Trader:
 
         self.timestamp = state.timestamp
 
-        #result['COCONUT_COUPON'] += self.compute_orders_coconut_coupon(state.order_depths)
-        orders, orders_coco = self.compute_orders_coconut_coupon(state)
-        result['COCONUT'] += orders_coco
-        result['COCONUT_COUPON'] += orders
+        result['COCONUT_COUPON'] += self.compute_orders_coconut_coupon(state)
+        # orders, orders_coco = self.compute_orders_coconut_coupon(state)
+        # result['COCONUT'] += orders_coco
+        # result['COCONUT_COUPON'] += orders
 
         logger.flush(state, result, conversions, "")
         return result, conversions, trader_data
