@@ -114,6 +114,7 @@ class Trader:
                       'CHOCOLATE': 250,
                       'ROSES' : 60,
                       'GIFT_BASKET' : 60,
+                      'COCONUT': 300,
                       'COCONUT_COUPON': 600
                       }
     person_position = defaultdict(def_value)
@@ -124,7 +125,7 @@ class Trader:
     basket_premium = 380
 
     trading_days = 250
-    day_number = 3
+    day_number = 1
     timestamps_per_day = 1000000
     coconut_annualised_volatility = 0.00010095 * (trading_days * (timestamps_per_day / 100))**(1/2)
     coconut_option_strike = 10000
@@ -198,7 +199,7 @@ class Trader:
                 else:
                     volume = -min(quantity, available_volume)
                     orders.append(Order('COCONUT_COUPON', price, volume))
-                    available_volume -= volume
+                    available_volume += volume
 
         if residual_buy < -trade_at:
             available_volume = self.POSITION_LIMIT['COCONUT_COUPON'] - self.position['COCONUT_COUPON']
@@ -213,6 +214,79 @@ class Trader:
                     available_volume -= volume
 
         return orders
+
+    # def compute_orders_coconut_coupon(self, state):
+    #     order_depth = state.order_depths
+    #     orders_coco : List[Order] = []
+    #     orders : List[Order] = []
+    #     prods = ['COCONUT', 'COCONUT_COUPON']
+    #     best_asks = {}
+    #     best_bids = {}
+    #     mid_prices = {}
+
+    #     for p in prods:
+    #         best_ask = self.best_ask(order_depth[p])
+    #         best_bid = self.best_bid(order_depth[p])
+    #         if best_ask == None or best_bid == None:
+    #             return [], []
+    #         else:
+    #             best_asks[p] = best_ask
+    #             best_bids[p] = best_bid
+    #             mid_prices[p] = (1/2)*(best_ask + best_bid)
+
+    #     residual_sell = best_bids['COCONUT_COUPON'] - self.black_scholes(best_asks['COCONUT'])
+    #     residual_buy = best_asks['COCONUT_COUPON'] - self.black_scholes(best_bids['COCONUT'])
+
+    #     trade_at = self.residual_std*0.3
+
+    #     if residual_sell > trade_at:
+    #         available_volume = self.position['COCONUT_COUPON'] + self.POSITION_LIMIT['COCONUT_COUPON']
+    #         buy_orders = order_depth["COCONUT_COUPON"].buy_orders.items()
+    #         for price, quantity in buy_orders:
+    #             if available_volume <= 0:
+    #                 break
+    #             else:
+    #                 volume = -min(quantity, available_volume)
+    #                 # Sell order
+    #                 orders.append(Order('COCONUT_COUPON', price, volume))
+    #                 available_volume += volume
+
+    #         available_volume_coco = self.position['COCONUT'] + self.POSITION_LIMIT['COCONUT']
+    #         sell_orders = order_depth["COCONUT"].sell_orders.items()
+    #         for price, quantity in sell_orders:
+    #             if available_volume_coco <= 0:
+    #                 break
+    #             else:
+    #                 volume = min(-quantity, available_volume_coco)
+    #                 # Buy order
+    #                 orders_coco.append(Order('COCONUT', price, volume))
+    #                 available_volume_coco -= volume
+
+    #     if residual_buy < -trade_at:
+    #         available_volume = self.POSITION_LIMIT['COCONUT_COUPON'] - self.position['COCONUT_COUPON']
+    #         sell_orders = order_depth["COCONUT_COUPON"].sell_orders.items()
+    #         for price, quantity in sell_orders:
+    #             if available_volume <= 0:
+    #                 break
+    #             else:
+    #                 volume = min(available_volume, -quantity)
+    #                 # Buy order
+    #                 orders.append(Order('COCONUT_COUPON', price, volume))
+    #                 available_volume -= volume
+
+    #         available_volume_coco = self.POSITION_LIMIT['COCONUT'] - self.position['COCONUT']
+    #         buy_orders = order_depth["COCONUT"].buy_orders.items()
+    #         for price, quantity in buy_orders:
+    #             if available_volume_coco <= 0:
+    #                 break
+    #             else:
+    #                 volume = -min(available_volume_coco, quantity)
+    #                 # Sell order
+    #                 orders_coco.append(Order('COCONUT', price, volume))
+    #                 available_volume_coco += volume
+
+    #     return orders, orders_coco
+
       
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
@@ -220,7 +294,7 @@ class Trader:
         and outputs a list of orders to be sent
         """
         
-        result = {'COCONUT_COUPON': []}
+        result = {'COCONUT_COUPON': [], 'COCONUT': []}
         conversions = 0
         trader_data = ""  
         
@@ -230,7 +304,10 @@ class Trader:
 
         self.timestamp = state.timestamp
 
-        result['COCONUT_COUPON'] += self.compute_orders_coconut_coupon(state.order_depths)
+        #result['COCONUT_COUPON'] += self.compute_orders_coconut_coupon(state.order_depths)
+        orders, orders_coco = self.compute_orders_coconut_coupon(state)
+        result['COCONUT'] += orders_coco
+        result['COCONUT_COUPON'] += orders
 
         logger.flush(state, result, conversions, "")
         return result, conversions, trader_data

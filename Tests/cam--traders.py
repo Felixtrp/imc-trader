@@ -345,7 +345,7 @@ class Trader:
             best_ask = self.best_ask(order_depth[p])
             best_bid = self.best_bid(order_depth[p])
             if best_ask == None or best_bid == None:
-                return []
+                return [], []
             else:
                 best_asks[p] = best_ask
                 best_bids[p] = best_bid
@@ -359,24 +359,24 @@ class Trader:
         if residual_sell > trade_at:
             available_volume = self.position['GIFT_BASKET'] + self.POSITION_LIMIT['GIFT_BASKET']
             buy_orders = order_depth["GIFT_BASKET"].buy_orders.items()
-            assert(available_volume >= 0)
             for price, quantity in buy_orders:
                 if available_volume <= 0:
                     break
                 else:
                     volume = -min(quantity, available_volume)
+                    # Sell order
                     orders.append(Order('GIFT_BASKET', price, volume))
-                    available_volume -= volume
+                    available_volume += volume
 
         if residual_buy < -trade_at:
             available_volume = self.POSITION_LIMIT['GIFT_BASKET'] - self.position['GIFT_BASKET']
             sell_orders = order_depth["GIFT_BASKET"].sell_orders.items()
-            assert(available_volume >= 0)
             for price, quantity in sell_orders:
                 if available_volume <= 0:
                     break
                 else:
                     volume = min(available_volume, -quantity)
+                    # Buy order
                     orders.append(Order('GIFT_BASKET', price, volume))
                     available_volume -= volume
 
@@ -400,7 +400,7 @@ class Trader:
         fair_value = self.normal_cdf(d_plus)*stock_mid_price - self.normal_cdf(d_minus)*self.coconut_option_strike
 
         return fair_value
-
+    
     def compute_orders_coconut_coupon(self, state):
         order_depth = state.order_depths
         orders : List[Order] = []
@@ -422,32 +422,29 @@ class Trader:
         residual_sell = best_bids['COCONUT_COUPON'] - self.black_scholes(best_asks['COCONUT'])
         residual_buy = best_asks['COCONUT_COUPON'] - self.black_scholes(best_bids['COCONUT'])
 
-        logger.print(residual_sell)
-        logger.print(residual_buy)
-
         trade_at = self.residual_std*0.3
 
         if residual_sell > trade_at:
             available_volume = self.position['COCONUT_COUPON'] + self.POSITION_LIMIT['COCONUT_COUPON']
             buy_orders = order_depth["COCONUT_COUPON"].buy_orders.items()
-            assert(available_volume >= 0)
             for price, quantity in buy_orders:
                 if available_volume <= 0:
                     break
                 else:
                     volume = -min(quantity, available_volume)
+                    # Sell order
                     orders.append(Order('COCONUT_COUPON', price, volume))
-                    available_volume -= volume
+                    available_volume += volume
 
         if residual_buy < -trade_at:
             available_volume = self.POSITION_LIMIT['COCONUT_COUPON'] - self.position['COCONUT_COUPON']
             sell_orders = order_depth["COCONUT_COUPON"].sell_orders.items()
-            assert(available_volume >= 0)
             for price, quantity in sell_orders:
                 if available_volume <= 0:
                     break
                 else:
                     volume = min(available_volume, -quantity)
+                    # Buy order
                     orders.append(Order('COCONUT_COUPON', price, volume))
                     available_volume -= volume
 
@@ -463,6 +460,7 @@ class Trader:
                   'STARFRUIT' : [],
                   'ORCHIDS' : [],
                   'GIFT_BASKET' : [],
+                  'COCONUT': [],
                   'COCONUT_COUPON': [],
                   }
         conversions = 0
@@ -513,9 +511,12 @@ class Trader:
 
         result['AMETHYSTS'] += self.compute_orders_amethysts("AMETHYSTS", state.order_depths["AMETHYSTS"], acc_bid["AMETHYSTS"], acc_ask["AMETHYSTS"])
         result['STARFRUIT'] += self.compute_orders_regression("STARFRUIT", state.order_depths["STARFRUIT"], acc_bid["STARFRUIT"], acc_ask["STARFRUIT"])
+
         conversions, orders = self.compute_orders_orchids("ORCHIDS", state.order_depths["ORCHIDS"], state, acc_bid['ORCHIDS'], acc_ask['ORCHIDS'])
         result['ORCHIDS'] += orders
+
         result['GIFT_BASKET'] += self.compute_orders_gift_baskets(state)
+        
         result['COCONUT_COUPON'] += self.compute_orders_coconut_coupon(state)
 
         trader_data = jsonpickle.encode(starfruit_cache)

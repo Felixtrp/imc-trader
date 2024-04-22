@@ -117,7 +117,8 @@ class Trader:
     def best_bid(self, order_depth):
         return next(iter(OrderedDict(sorted(order_depth.buy_orders.items(), reverse=True))))
     
-    def compute_orders_gift_baskets(self, order_depth):
+    def compute_orders_gift_baskets(self, state):
+        order_depth = state.order_depths
         orders = []
         prods = ['STRAWBERRIES', 'CHOCOLATE', 'ROSES', 'GIFT_BASKET']
         best_asks = {}
@@ -136,30 +137,30 @@ class Trader:
 
         residual_sell = best_bids['GIFT_BASKET']  - best_asks['STRAWBERRIES']*6 - best_asks['CHOCOLATE']*4 - best_asks['ROSES'] - self.basket_premium
         residual_buy = best_asks['GIFT_BASKET']  - best_bids['STRAWBERRIES']*6 - best_bids['CHOCOLATE']*4 - best_bids['ROSES'] - self.basket_premium
-        
+
         trade_at = self.basket_std*0.4
 
         if residual_sell > trade_at:
             available_volume = self.position['GIFT_BASKET'] + self.POSITION_LIMIT['GIFT_BASKET']
             buy_orders = order_depth["GIFT_BASKET"].buy_orders.items()
-            assert(available_volume >= 0)
             for price, quantity in buy_orders:
                 if available_volume <= 0:
                     break
                 else:
                     volume = -min(quantity, available_volume)
+                    # Sell order
                     orders.append(Order('GIFT_BASKET', price, volume))
-                    available_volume -= volume
+                    available_volume += volume
 
         if residual_buy < -trade_at:
             available_volume = self.POSITION_LIMIT['GIFT_BASKET'] - self.position['GIFT_BASKET']
             sell_orders = order_depth["GIFT_BASKET"].sell_orders.items()
-            assert(available_volume >= 0)
             for price, quantity in sell_orders:
                 if available_volume <= 0:
                     break
                 else:
                     volume = min(available_volume, -quantity)
+                    # Buy order
                     orders.append(Order('GIFT_BASKET', price, volume))
                     available_volume -= volume
 
@@ -179,7 +180,7 @@ class Trader:
         for key, val in state.position.items():
             self.position[key] = val
 
-        result['GIFT_BASKET'] += self.compute_orders_gift_baskets(state.order_depths)
+        result['GIFT_BASKET'] += self.compute_orders_gift_baskets(state)
 
         logger.flush(state, result, conversions, "")
         return result, conversions, trader_data
