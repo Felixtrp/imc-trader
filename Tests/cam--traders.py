@@ -4,8 +4,7 @@ from typing import Dict, List
 from datamodel import Listing, Observation, Order, OrderDepth, ProsperityEncoder, Symbol, Trade, TradingState
 import copy
 import jsonpickle
-from collections import defaultdict, OrderedDict
-import collections
+from collections import OrderedDict
 import math
 import numpy as np
 
@@ -127,7 +126,7 @@ class Trader:
     basket_premium = 380
 
     trading_days = 250
-    day_number = 3
+    day_number = 4
     timestamps_per_day = 1000000
     coconut_annualised_volatility = 0.00010095 * (trading_days * (timestamps_per_day / 100))**(1/2)
     coconut_option_strike = 10000
