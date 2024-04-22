@@ -124,9 +124,9 @@ class Trader:
     basket_premium = 380
 
     trading_days = 250
-    day_number = 1
+    day_number = 3
     timestamps_per_day = 1000000
-    coconut_annualised_volatility = 0.000101 * (trading_days * (timestamps_per_day / 100))**(1/2)
+    coconut_annualised_volatility = 0.00010095 * (trading_days * (timestamps_per_day / 100))**(1/2)
     coconut_option_strike = 10000
     residual_std = 13.3
     
@@ -148,11 +148,16 @@ class Trader:
         q = math.erf(x / math.sqrt(2.0))
         return (1.0 + q) / 2.0
 
+    def volatility_smile(self, stock_price):
+        a, c = 9.510469372524675e-08, 0.15885082971839998
+        return a*(stock_price - self.coconut_option_strike)**2 + c
+    
     def black_scholes(self, stock_mid_price):
         time_to_expiry_beginning = 1 - (self.day_number-1)/self.trading_days
         time_to_expiry = time_to_expiry_beginning - (self.timestamp / (self.trading_days*self.timestamps_per_day))
-        vol_adjustment = self.coconut_annualised_volatility * math.sqrt(time_to_expiry)
-        d_plus = (1/vol_adjustment) * (math.log(stock_mid_price / self.coconut_option_strike) + ((self.coconut_annualised_volatility**2)/2)*time_to_expiry)
+        ann_vol = self.volatility_smile(stock_mid_price) #self.coconut_annualised_volatility
+        vol_adjustment = ann_vol * math.sqrt(time_to_expiry)
+        d_plus = (1/vol_adjustment) * (math.log(stock_mid_price / self.coconut_option_strike) + ((ann_vol**2)/2)*time_to_expiry)
         d_minus = d_plus - vol_adjustment
         fair_value = self.normal_cdf(d_plus)*stock_mid_price - self.normal_cdf(d_minus)*self.coconut_option_strike
 
@@ -175,9 +180,11 @@ class Trader:
                 best_bids[p] = best_bid
                 mid_prices[p] = (1/2)*(best_ask + best_bid)
 
-        coupon_fair_value = self.black_scholes(mid_prices['COCONUT'])
         residual_sell = best_bids['COCONUT_COUPON'] - self.black_scholes(best_asks['COCONUT'])
         residual_buy = best_asks['COCONUT_COUPON'] - self.black_scholes(best_bids['COCONUT'])
+
+        logger.print(residual_sell)
+        logger.print(residual_buy)
 
         trade_at = self.residual_std*0.3
 
@@ -189,10 +196,11 @@ class Trader:
                 if available_volume <= 0:
                     break
                 else:
-                    orders.append(Order('COCONUT_COUPON', price, -quantity))
-                    available_volume -= quantity
+                    volume = -min(quantity, available_volume)
+                    orders.append(Order('COCONUT_COUPON', price, volume))
+                    available_volume -= volume
 
-        elif residual_buy < -trade_at:
+        if residual_buy < -trade_at:
             available_volume = self.POSITION_LIMIT['COCONUT_COUPON'] - self.position['COCONUT_COUPON']
             sell_orders = order_depth["COCONUT_COUPON"].sell_orders.items()
             assert(available_volume >= 0)
@@ -200,8 +208,9 @@ class Trader:
                 if available_volume <= 0:
                     break
                 else:
-                    orders.append(Order('COCONUT_COUPON', price, -quantity))
-                    available_volume += quantity
+                    volume = min(available_volume, -quantity)
+                    orders.append(Order('COCONUT_COUPON', price, volume))
+                    available_volume -= volume
 
         return orders
       

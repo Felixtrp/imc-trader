@@ -147,10 +147,11 @@ class Trader:
                 if available_volume <= 0:
                     break
                 else:
-                    orders.append(Order('GIFT_BASKET', price, -quantity))
-                    available_volume -= quantity
+                    volume = -min(quantity, available_volume)
+                    orders.append(Order('GIFT_BASKET', price, volume))
+                    available_volume -= volume
 
-        elif residual_buy < -trade_at:
+        if residual_buy < -trade_at:
             available_volume = self.POSITION_LIMIT['GIFT_BASKET'] - self.position['GIFT_BASKET']
             sell_orders = order_depth["GIFT_BASKET"].sell_orders.items()
             assert(available_volume >= 0)
@@ -158,8 +159,9 @@ class Trader:
                 if available_volume <= 0:
                     break
                 else:
-                    orders.append(Order('GIFT_BASKET', price, -quantity))
-                    available_volume += quantity
+                    volume = min(available_volume, -quantity)
+                    orders.append(Order('GIFT_BASKET', price, volume))
+                    available_volume -= volume
 
         return orders
       

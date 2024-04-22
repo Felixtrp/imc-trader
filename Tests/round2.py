@@ -113,71 +113,57 @@ class Trader:
     
     def best_ask(self, order_depth):
         return next(iter(OrderedDict(sorted(order_depth.sell_orders.items()))))
-    
-    def worst_ask(self, order_depth):
-        return next(iter(OrderedDict(sorted(order_depth.sell_orders.items(), reverse=True))))
-    
+
     def best_bid(self, order_depth):
         return next(iter(OrderedDict(sorted(order_depth.buy_orders.items(), reverse=True))))
+
+    def compute_orders_orchids(self, product, order_depth, state, acc_bid, acc_ask):
+        orders: list[Order] = []
+
+        limit = self.POSITION_LIMIT[product]
+        osell = OrderedDict(sorted(order_depth.sell_orders.items()))
+        obuy = OrderedDict(sorted(order_depth.buy_orders.items(), reverse=True))
+
+        cpos = self.position[product]
+
+        obs = state.observations.conversionObservations[product]
+        import_tariff = obs.importTariff
+        shipment_cost = obs.transportFees
+        mid_price = (acc_ask + acc_bid) / 2
+        ask = int(acc_ask + shipment_cost + import_tariff)
+        did_sell = 0
+        conversions = -cpos
+        if math.ceil(mid_price) < min(obuy, key=obuy.get):
+            did_sell, orders = self.market_taker_sell(product, orders, obuy, 0, ask + import_tariff + shipment_cost, limit, did_sell) #cpos
+        if int(mid_price) - 1 > acc_ask + import_tariff + shipment_cost:
+            orders.append(Order(product, int(mid_price) - 1, -limit - did_sell))
+        elif int(mid_price) - 0 > acc_ask + import_tariff + shipment_cost:
+            orders.append(Order(product, int(mid_price) - 0, -limit - did_sell))
+        return conversions, orders
     
-    def worst_bid(self, order_depth):
-        return next(iter(OrderedDict(sorted(order_depth.buy_orders.items()))))
-    
-    def compute_orders_gift_baskets(self, order_depth):
-        orders = {'GIFT_BASKET' : []}
-        prods = ['STRAWBERRIES', 'CHOCOLATE', 'ROSES', 'GIFT_BASKET']
-        mid_prices = {}
-
-        for p in prods:
-            best_ask = self.best_ask(order_depth[p])
-            best_bid = self.best_bid(order_depth[p])
-            mid_prices[p] = (1/2)*(best_ask + best_bid)
-
-        residual_buy = mid_prices['GIFT_BASKET']  - mid_prices['STRAWBERRIES']*6 - mid_prices['CHOCOLATE']*4 - mid_prices['ROSES'] - self.basket_premium
-        residual_sell = mid_prices['GIFT_BASKET'] - mid_prices['STRAWBERRIES']*6 - mid_prices['CHOCOLATE']*4 - mid_prices['ROSES'] - self.basket_premium
-
-        trade_at = self.basket_std*0.5
-
-        if residual_sell > trade_at:
-            available_volume = self.position['GIFT_BASKET'] + self.POSITION_LIMIT['GIFT_BASKET']
-            buy_orders = order_depth["GIFT_BASKET"].buy_orders.items()
-            assert(available_volume >= 0)
-            for price, quantity in buy_orders:
-                if available_volume <= 0:
-                    break
-                else:
-                    orders['GIFT_BASKET'].append(Order('GIFT_BASKET', price, -quantity))
-                    available_volume -= quantity
-
-        elif residual_buy < -trade_at:
-            available_volume = self.POSITION_LIMIT['GIFT_BASKET'] - self.position['GIFT_BASKET']
-            sell_orders = order_depth["GIFT_BASKET"].sell_orders.items()
-            assert(available_volume >= 0)
-            for price, quantity in sell_orders:
-                if available_volume <= 0:
-                    break
-                else:
-                    orders['GIFT_BASKET'].append(Order('GIFT_BASKET', price, -quantity))
-                    available_volume += quantity
-
-        return orders
-      
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
         Only method required. It takes all buy and sell orders for all symbols as an input,
         and outputs a list of orders to be sent
         """
         
-        result = {'GIFT_BASKET': [], 'CHOCOLATE': [], 'ROSES' : [], 'STRAWBERRIES' :[]}
+        result = {'ORCHIDS': []}
         conversions = 0
         trader_data = ""  
-        
+
         # Update positions based on state
         for key, val in state.position.items():
             self.position[key] = val
 
-        orders = self.compute_orders_gift_baskets(state.order_depths)
-        result['GIFT_BASKET'] += orders['GIFT_BASKET']
+        obs = state.observations.conversionObservations['ORCHIDS']
+
+        acc_bid = {}
+        acc_ask = {}
+        acc_bid['ORCHIDS'] = obs.bidPrice
+        acc_ask['ORCHIDS'] = obs.askPrice
+
+        conversions, orders = self.compute_orders_orchids("ORCHIDS", state.order_depths["ORCHIDS"], state, acc_bid['ORCHIDS'], acc_ask['ORCHIDS'])
+        result['ORCHIDS'] += orders
 
         logger.flush(state, result, conversions, "")
         return result, conversions, trader_data
