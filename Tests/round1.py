@@ -108,10 +108,18 @@ class Trader:
     basket_premium = 380
     
     def best_ask(self, order_depth):
-        return next(iter(OrderedDict(sorted(order_depth.sell_orders.items()))))
+        sell_orders = OrderedDict(sorted(order_depth.sell_orders.items()))
+        if bool(sell_orders):
+            return next(iter(sell_orders))
+        else:
+            return None
     
-    def worst_ask(self, order_depth):
-        return next(iter(OrderedDict(sorted(order_depth.sell_orders.items(), reverse=True))))
+    def best_bid(self, order_depth):
+        buy_orders = OrderedDict(sorted(order_depth.buy_orders.items(), reverse=True))
+        if bool(buy_orders):
+            return next(iter(buy_orders))
+        else:
+            return None
     
     def values_extract(self, order_dict, buy=0):
         tot_vol = 0
@@ -207,17 +215,53 @@ class Trader:
 
         return int(round(predicted_mid_price))
     
-    def compute_orders_regression(self, product, order_depth, acc_bid, acc_ask):
+    def compute_signal(self, state, mid_price):
+        previous_trades = state.market_trades.get("STARFRUIT", [])
+        signals = []
+        for trade in previous_trades:
+            if trade.buyer == "Rhianna" and trade.price > mid_price and trade.quantity > 5:
+                signals.append(1)
+            if trade.seller == "Rhianna" and trade.price < mid_price and trade.quantity > 5:
+                signals.append(-1)
+            if trade.buyer == "Ruby" and trade.price > mid_price and trade.quantity > 11:
+                signals.append(0)
+            if trade.seller == "Ruby" and trade.price < mid_price and trade.quantity > 11:
+                signals.append(0)
+
+        if sum(signals) > 0.5:
+            return "Buy"
+        
+        elif sum(signals) < -0.5:
+            return "Sell"
+        
+        else:
+            return ""
+    
+    def compute_orders_regression(self, product, order_depth, acc_bid, acc_ask, state, mid_prices):
+        best_ask = self.best_ask(order_depth)
+        best_bid = self.best_bid(order_depth)
+
+        limit = self.POSITION_LIMIT[product]
+        cpos = self.position[product]
+            
         orders: list[Order] = []
+
+        if mid_prices.size > 1:
+            sig = self.compute_signal(state, mid_prices[-1])
+            if sig == "Buy":
+                max_buy = (limit - cpos)
+                # Buy max
+                return [Order("STARFRUIT", best_ask, max_buy)]
+            elif sig == "Sell":
+                max_sell = -(limit + cpos)
+                # Buy max
+                return [Order("STARFRUIT", best_bid, max_sell)]
 
         osell = OrderedDict(sorted(order_depth.sell_orders.items()))
         obuy = OrderedDict(sorted(order_depth.buy_orders.items(), reverse=True))
-        limit = self.POSITION_LIMIT[product]
 
         _, best_sell_pr = self.values_extract(osell)
         _, best_buy_pr = self.values_extract(obuy, 1)
-
-        cpos = self.position[product]
         
         # market take
         for ask, vol in osell.items():
@@ -288,7 +332,6 @@ class Trader:
             starfruit_cache.pop(0)
 
         mid_prices = np.array(starfruit_cache)
-
         INF = 1e9
         
         starfruit_lb = -INF
@@ -307,7 +350,7 @@ class Trader:
         acc_ask['STARFRUIT'] = starfruit_ub
 
         result['AMETHYSTS'] += self.compute_orders_amethysts("AMETHYSTS", state.order_depths["AMETHYSTS"], acc_bid["AMETHYSTS"], acc_ask["AMETHYSTS"])
-        result['STARFRUIT'] += self.compute_orders_regression("STARFRUIT", state.order_depths["STARFRUIT"], acc_bid["STARFRUIT"], acc_ask["STARFRUIT"])
+        result['STARFRUIT'] += self.compute_orders_regression("STARFRUIT", state.order_depths["STARFRUIT"], acc_bid["STARFRUIT"], acc_ask["STARFRUIT"], state, mid_prices)
 
         trader_data = jsonpickle.encode(starfruit_cache)
         logger.flush(state, result, conversions, "")

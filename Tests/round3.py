@@ -93,7 +93,7 @@ class Logger:
 
 logger = Logger()
 
-empty_dict = {'GIFT_BASKET' : 0}
+empty_dict = {'GIFT_BASKET' : 0, 'CHOCOLATE' : 0, 'ROSES' : 0, "STRAWBERRIES" : 0}
 def def_value():
         return copy.deepcopy(empty_dict)
 
@@ -110,12 +110,55 @@ class Trader:
     starfruit_dim = 4
     basket_std = 77
     basket_premium = 380
+    event = 0
     
     def best_ask(self, order_depth):
         return next(iter(OrderedDict(sorted(order_depth.sell_orders.items()))))
     
     def best_bid(self, order_depth):
         return next(iter(OrderedDict(sorted(order_depth.buy_orders.items(), reverse=True))))
+
+    def compute_orders_roses(self, state) -> List[Order]:
+        orders_roses : List[Order] = []
+
+        previous_trades = state.market_trades.get("ROSES", [])
+        for trade in previous_trades:
+            if trade.timestamp == state.timestamp - 100:
+                if trade.buyer == 'Rhianna':
+                    self.event = 1
+                elif trade.seller == 'Rhianna':
+                    self.event = -1
+
+        limit = self.POSITION_LIMIT["ROSES"]
+        cpos = self.position["ROSES"]
+        
+        if self.event == 1:
+            # Buy max
+            available_volume = (limit - cpos)
+            sell_orders = state.order_depths["ROSES"].sell_orders.items()
+            for price, quantity in sell_orders:
+                if available_volume <= 0:
+                    break
+                else:
+                    volume = min(available_volume, -quantity)
+                    # Buy order
+                    orders_roses.append(Order('ROSES', price, volume))
+                    available_volume -= volume
+
+        elif self.event == -1:
+            # Sell max
+            available_volume = limit + cpos
+            buy_orders = state.order_depths["ROSES"].buy_orders.items()
+            for price, quantity in buy_orders:
+                if available_volume <= 0:
+                    break
+                else:
+                    volume = -min(quantity, available_volume)
+                    # Sell order
+                    orders_roses.append(Order('ROSES', price, volume))
+                    available_volume += volume
+
+        return orders_roses
     
     def compute_orders_gift_baskets(self, state):
         order_depth = state.order_depths
@@ -180,7 +223,8 @@ class Trader:
         for key, val in state.position.items():
             self.position[key] = val
 
+        result['ROSES'] += self.compute_orders_roses(state)
         result['GIFT_BASKET'] += self.compute_orders_gift_baskets(state)
-
+            
         logger.flush(state, result, conversions, "")
         return result, conversions, trader_data

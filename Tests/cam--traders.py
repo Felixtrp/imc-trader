@@ -122,11 +122,12 @@ class Trader:
 
     max_starfruit_length = 20
 
+    event = 0
     basket_std = 77
     basket_premium = 380
 
     trading_days = 250
-    day_number = 4
+    day_number = 5
     timestamps_per_day = 1000000
     coconut_annualised_volatility = 0.00010095 * (trading_days * (timestamps_per_day / 100))**(1/2)
     coconut_option_strike = 10000
@@ -333,6 +334,48 @@ class Trader:
             orders.append(Order(product, int(mid_price) - 0, -limit - did_sell))
         return conversions, orders
 
+    def compute_orders_roses(self, state) -> List[Order]:
+        orders_roses : List[Order] = []
+
+        previous_trades = state.market_trades.get("ROSES", [])
+        for trade in previous_trades:
+            if trade.timestamp == state.timestamp - 100:
+                if trade.buyer == 'Rhianna':
+                    self.event = 1
+                elif trade.seller == 'Rhianna':
+                    self.event = -1
+
+        limit = self.POSITION_LIMIT["ROSES"]
+        cpos = self.position["ROSES"]
+        
+        if self.event == 1:
+            # Buy max
+            available_volume = (limit - cpos)
+            sell_orders = state.order_depths["ROSES"].sell_orders.items()
+            for price, quantity in sell_orders:
+                if available_volume <= 0:
+                    break
+                else:
+                    volume = min(available_volume, -quantity)
+                    # Buy order
+                    orders_roses.append(Order('ROSES', price, volume))
+                    available_volume -= volume
+
+        elif self.event == -1:
+            # Sell max
+            available_volume = limit + cpos
+            buy_orders = state.order_depths["ROSES"].buy_orders.items()
+            for price, quantity in buy_orders:
+                if available_volume <= 0:
+                    break
+                else:
+                    volume = -min(quantity, available_volume)
+                    # Sell order
+                    orders_roses.append(Order('ROSES', price, volume))
+                    available_volume += volume
+
+        return orders_roses
+    
     def compute_orders_gift_baskets(self, state):
         order_depth = state.order_depths
         orders = []
@@ -459,6 +502,7 @@ class Trader:
         result = {'AMETHYSTS' : [],
                   'STARFRUIT' : [],
                   'ORCHIDS' : [],
+                  'ROSES': [],
                   'GIFT_BASKET' : [],
                   'COCONUT': [],
                   'COCONUT_COUPON': [],
@@ -515,6 +559,7 @@ class Trader:
         conversions, orders = self.compute_orders_orchids("ORCHIDS", state.order_depths["ORCHIDS"], state, acc_bid['ORCHIDS'], acc_ask['ORCHIDS'])
         result['ORCHIDS'] += orders
 
+        result['ROSES'] += self.compute_orders_roses(state)
         result['GIFT_BASKET'] += self.compute_orders_gift_baskets(state)
         
         result['COCONUT_COUPON'] += self.compute_orders_coconut_coupon(state)
